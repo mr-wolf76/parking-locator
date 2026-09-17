@@ -1,6 +1,0 @@
-{
-  "name": "Parking Information and Locator System",
-  "description": "A Web-Based System for Finding Parking Facilities Near Selected Destinations in Kathmandu",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
