@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function() {
+        try {
+          var currentFetch = window.fetch;
+          var proto = Object.getPrototypeOf(window);
+          var protoDesc = proto ? Object.getOwnPropertyDescriptor(proto, 'fetch') : null;
+          if (protoDesc && !protoDesc.set && protoDesc.configurable) {
+            Object.defineProperty(proto, 'fetch', {
+              get: function() { return currentFetch; },
+              set: function(fn) { currentFetch = fn; },
+              configurable: true,
+              enumerable: true
+            });
+          }
+        } catch (e) {}
+
+        try {
+          var _f = window.fetch ? window.fetch.bind(window) : null;
+          Object.defineProperty(window, 'fetch', {
+            get: function() { return _f; },
+            set: function(fn) { _f = fn; },
+            configurable: true,
+            enumerable: true
+          });
+        } catch (e) {}
+      })();
+    </script>
+    <title>Parking Information and Locator System</title>
+    <meta name="description" content="A Web-Based System for Finding Parking Facilities Near Selected Destinations in Kathmandu" />
+    <meta property="og:title" content="Parking Information and Locator System" />
+    <meta property="og:description" content="A Web-Based System for Finding Parking Facilities Near Selected Destinations in Kathmandu" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
