@@ -7,7 +7,6 @@ $facility = getParkingById($id);
 if (!$facility || $facility['status'] !== 'active') {
     $pageTitle = 'Parking Facility Not Found | Parking Locator';
     require_once __DIR__ . '/includes/header.php';
-    require_once __DIR__ . '/includes/navbar.php';
     ?>
     <div class="container py-5 text-center flex-grow-1">
         <div class="py-5">
@@ -30,7 +29,6 @@ $pageTitle = htmlspecialchars($facility['name']) . ' - Details | Parking Locator
 $directionsUrl = "https://www.google.com/maps/dir/?api=1&destination=" . $facility['latitude'] . "," . $facility['longitude'];
 
 require_once __DIR__ . '/includes/header.php';
-require_once __DIR__ . '/includes/navbar.php';
 ?>
 
 <div class="bg-white border-bottom py-3">
@@ -80,6 +78,84 @@ require_once __DIR__ . '/includes/navbar.php';
                 <p class="text-muted mb-4 fs-6">
                     <i class="bi bi-pin-map-fill text-danger me-1"></i> <?php echo htmlspecialchars($facility['address']); ?>
                 </p>
+
+                <?php 
+                    $liveData = formatRealtimeSpacesData($facility); 
+                ?>
+                <!-- Real-Time Live Space Availability Card -->
+                <div class="card border rounded-3 p-3 mb-4 live-space-box bg-white shadow-xs" id="detail-live-card" data-facility-id="<?php echo $facility['id']; ?>">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="live-pulse-dot <?php echo ($liveData['status_level'] === 'full' ? 'dot-danger' : ($liveData['status_level'] === 'limited' ? 'dot-warning' : '')); ?>" id="detail-pulse-dot"></span>
+                            <span class="fw-bold text-dark">Real-Time Parking Space Availability</span>
+                            <span class="badge bg-light text-muted border small d-none d-sm-inline">Live Sensor Sync</span>
+                        </div>
+                        <div class="text-muted small" style="font-size: 0.8rem;">
+                            <i class="bi bi-clock me-1"></i><span id="detail-last-updated">Updated: <?php echo date('h:i:s A', strtotime($liveData['last_updated'])); ?></span>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 align-items-center mb-3">
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-baseline gap-2">
+                                <span class="display-6 fw-bold <?php echo $liveData['text_color']; ?>" id="detail-avail-count">
+                                    <?php echo $liveData['available_spaces']; ?>
+                                </span>
+                                <span class="fs-5 text-muted">/ <?php echo $liveData['total_capacity']; ?> total spots free</span>
+                            </div>
+                            <div class="mt-1">
+                                <span class="badge <?php echo $liveData['badge_class']; ?> px-3 py-2 fs-7" id="detail-status-badge">
+                                    <i class="bi bi-broadcast me-1"></i><?php echo $liveData['status_text']; ?>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex justify-content-between small text-muted mb-1">
+                                <span>Occupancy Rate</span>
+                                <span class="fw-bold text-dark" id="detail-occupancy-pct"><?php echo $liveData['occupancy_percent']; ?>% Full</span>
+                            </div>
+                            <div class="progress" style="height: 10px;">
+                                <div class="progress-bar <?php echo ($liveData['status_level'] === 'full' ? 'bg-danger' : ($liveData['status_level'] === 'limited' ? 'bg-warning' : 'bg-success')); ?>" 
+                                     id="detail-occupancy-bar"
+                                     role="progressbar" 
+                                     style="width: <?php echo $liveData['occupancy_percent']; ?>%;" 
+                                     aria-valuenow="<?php echo $liveData['occupancy_percent']; ?>" aria-valuemin="0" aria-valuemax="100">
+                                </div>
+                            </div>
+                            <div class="text-muted small mt-1 text-end" style="font-size: 0.75rem;">
+                                <?php echo $liveData['occupied_spaces']; ?> spaces currently occupied
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Category Breakdown -->
+                    <div class="row g-2 pt-2 border-top text-center">
+                        <div class="col-6 col-md-4">
+                            <div class="p-2 rounded bg-light border">
+                                <div class="text-muted small mb-1"><i class="bi bi-bicycle me-1"></i>Two-Wheelers</div>
+                                <div class="fw-bold fs-6 text-dark" id="detail-bike-count">
+                                    <?php echo $liveData['available_bike']; ?> <span class="text-muted fw-normal fs-7">/ <?php echo $liveData['capacity_bike']; ?> free</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <div class="p-2 rounded bg-light border">
+                                <div class="text-muted small mb-1"><i class="bi bi-car-front me-1"></i>Four-Wheelers</div>
+                                <div class="fw-bold fs-6 text-dark" id="detail-car-count">
+                                    <?php echo $liveData['available_car']; ?> <span class="text-muted fw-normal fs-7">/ <?php echo $liveData['capacity_car']; ?> free</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <div class="p-2 rounded bg-light border d-flex flex-column justify-content-center h-100">
+                                <div class="text-muted small mb-1"><i class="bi bi-shield-check me-1"></i>Status</div>
+                                <div class="fw-semibold small text-success">
+                                    <i class="bi bi-check-circle me-1"></i>Gate Open
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <?php if (!empty($facility['image'])): ?>
                     <div class="mb-4 rounded-3 overflow-hidden border">
@@ -159,8 +235,8 @@ require_once __DIR__ . '/includes/navbar.php';
     </div>
 </div>
 
-<script src="<?php echo $baseUrl; ?>/assets/js/map.js"></script>
 <script>
+window.appBaseUrl = <?php echo json_encode($baseUrl); ?>;
 document.addEventListener('DOMContentLoaded', function() {
     initDetailMap(
         <?php echo (float)$facility['latitude']; ?>,

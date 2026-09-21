@@ -10,18 +10,13 @@ function sanitizeInput($data) {
 
 function getBaseUrl() {
     $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
-    $dir = dirname($scriptName);
-    if ($dir === '/' || $dir === '\\' || $dir === '.') {
+    $dir = str_replace('\\', '/', dirname($scriptName));
+    if ($dir === '/' || $dir === '.' || $dir === '') {
         return '';
     }
-    $normalized = '/' . trim(str_replace('\\', '/', $dir), '/');
-    if ($normalized === '/admin') {
-        return '';
-    }
-    if (strpos($normalized, '/admin') !== false) {
-        $parts = explode('/admin', $normalized);
-        return $parts[0];
-    }
+    // Strip trailing /admin or /api subdirectories if called from within them
+    $dir = preg_replace('#/(admin|api)(/.*)?$#i', '', $dir);
+    $normalized = '/' . trim($dir, '/');
     return $normalized === '/' ? '' : $normalized;
 }
 
@@ -230,6 +225,10 @@ function getActiveParking($filters = []) {
     return $stmt->fetchAll();
 }
 
+function getAllActiveParking($filters = []) {
+    return getActiveParking($filters);
+}
+
 function getNearbyParking($destLat, $destLon, $filters = []) {
     $facilities = getActiveParking($filters);
     $results = [];
@@ -333,13 +332,20 @@ function getAdminStatistics() {
 function createParking($data) {
     $db = getDbConnection();
     $sql = "INSERT INTO parking_facilities 
-            (name, address, area, latitude, longitude, payment_type, parking_fee, vehicle_type, opening_time, closing_time, contact, description, image, status, last_verified, created_at) 
-            VALUES (:name, :address, :area, :latitude, :longitude, :payment_type, :parking_fee, :vehicle_type, :opening_time, :closing_time, :contact, :description, :image, :status, :last_verified, datetime('now'))";
+            (name, address, area, latitude, longitude, payment_type, parking_fee, vehicle_type, total_capacity, available_spaces, capacity_bike, available_bike, capacity_car, available_car, opening_time, closing_time, contact, description, image, status, last_verified, created_at) 
+            VALUES (:name, :address, :area, :latitude, :longitude, :payment_type, :parking_fee, :vehicle_type, :total_capacity, :available_spaces, :capacity_bike, :available_bike, :capacity_car, :available_car, :opening_time, :closing_time, :contact, :description, :image, :status, :last_verified, datetime('now'))";
 
     $driver = $db->getAttribute(PDO::ATTR_DRIVER_NAME);
     if ($driver === 'mysql') {
         $sql = str_replace("datetime('now')", "NOW()", $sql);
     }
+
+    $capBike = isset($data['capacity_bike']) ? (int)$data['capacity_bike'] : 30;
+    $availBike = isset($data['available_bike']) ? (int)$data['available_bike'] : min(12, $capBike);
+    $capCar = isset($data['capacity_car']) ? (int)$data['capacity_car'] : 20;
+    $availCar = isset($data['available_car']) ? (int)$data['available_car'] : min(8, $capCar);
+    $totalCap = isset($data['total_capacity']) ? (int)$data['total_capacity'] : ($capBike + $capCar);
+    $availSpaces = isset($data['available_spaces']) ? (int)$data['available_spaces'] : ($availBike + $availCar);
 
     $stmt = $db->prepare($sql);
     return $stmt->execute([
@@ -351,6 +357,12 @@ function createParking($data) {
         ':payment_type' => $data['payment_type'],
         ':parking_fee' => $data['parking_fee'] ?? null,
         ':vehicle_type' => $data['vehicle_type'],
+        ':total_capacity' => $totalCap,
+        ':available_spaces' => $availSpaces,
+        ':capacity_bike' => $capBike,
+        ':available_bike' => $availBike,
+        ':capacity_car' => $capCar,
+        ':available_car' => $availCar,
         ':opening_time' => $data['opening_time'] ?? '07:00:00',
         ':closing_time' => $data['closing_time'] ?? '21:00:00',
         ':contact' => $data['contact'] ?? null,
@@ -372,6 +384,12 @@ function updateParking($id, $data) {
             payment_type = :payment_type,
             parking_fee = :parking_fee,
             vehicle_type = :vehicle_type,
+            total_capacity = :total_capacity,
+            available_spaces = :available_spaces,
+            capacity_bike = :capacity_bike,
+            available_bike = :available_bike,
+            capacity_car = :capacity_car,
+            available_car = :available_car,
             opening_time = :opening_time,
             closing_time = :closing_time,
             contact = :contact,
@@ -387,6 +405,13 @@ function updateParking($id, $data) {
         $sql .= ", updated_at = datetime('now') WHERE id = :id";
     }
 
+    $capBike = isset($data['capacity_bike']) ? (int)$data['capacity_bike'] : 30;
+    $availBike = isset($data['available_bike']) ? (int)$data['available_bike'] : 12;
+    $capCar = isset($data['capacity_car']) ? (int)$data['capacity_car'] : 20;
+    $availCar = isset($data['available_car']) ? (int)$data['available_car'] : 8;
+    $totalCap = isset($data['total_capacity']) ? (int)$data['total_capacity'] : ($capBike + $capCar);
+    $availSpaces = isset($data['available_spaces']) ? (int)$data['available_spaces'] : ($availBike + $availCar);
+
     $stmt = $db->prepare($sql);
     return $stmt->execute([
         ':id' => (int)$id,
@@ -398,6 +423,12 @@ function updateParking($id, $data) {
         ':payment_type' => $data['payment_type'],
         ':parking_fee' => $data['parking_fee'] ?? null,
         ':vehicle_type' => $data['vehicle_type'],
+        ':total_capacity' => $totalCap,
+        ':available_spaces' => $availSpaces,
+        ':capacity_bike' => $capBike,
+        ':available_bike' => $availBike,
+        ':capacity_car' => $capCar,
+        ':available_car' => $availCar,
         ':opening_time' => $data['opening_time'],
         ':closing_time' => $data['closing_time'],
         ':contact' => $data['contact'] ?? null,
@@ -451,3 +482,208 @@ function updateReportStatus($reportId, $status) {
     $stmt = $db->prepare("UPDATE parking_reports SET status = ? WHERE id = ?");
     return $stmt->execute([$status, (int)$reportId]);
 }
+
+/**
+ * Real-Time Parking Availability Functions
+ * Academic BIM Project - Realtime Parking Tracker
+ */
+
+function formatRealtimeSpacesData($facility) {
+    $totalCapacity = (int)($facility['total_capacity'] ?? 50);
+    $availableSpaces = (int)($facility['available_spaces'] ?? 20);
+    $capacityBike = (int)($facility['capacity_bike'] ?? 30);
+    $availableBike = (int)($facility['available_bike'] ?? 12);
+    $capacityCar = (int)($facility['capacity_car'] ?? 20);
+    $availableCar = (int)($facility['available_car'] ?? 8);
+
+    // Ensure non-negative bounds
+    $availableSpaces = max(0, min($totalCapacity, $availableSpaces));
+    $availableBike = max(0, min($capacityBike, $availableBike));
+    $availableCar = max(0, min($capacityCar, $availableCar));
+
+    $occupied = max(0, $totalCapacity - $availableSpaces);
+    $occupancyPercent = ($totalCapacity > 0) ? round(($occupied / $totalCapacity) * 100) : 0;
+
+    // Determine status badge and label
+    if ($availableSpaces <= 0) {
+        $statusLevel = 'full';
+        $statusText = 'FULL (0 Spots)';
+        $badgeClass = 'bg-danger';
+        $textColor = 'text-danger';
+        $markerColor = '#dc3545'; // Red
+    } elseif ($availableSpaces <= max(3, round($totalCapacity * 0.15))) {
+        $statusLevel = 'limited';
+        $statusText = 'Filling Fast (' . $availableSpaces . ' Left)';
+        $badgeClass = 'bg-warning text-dark';
+        $textColor = 'text-warning';
+        $markerColor = '#fd7e14'; // Orange/Amber
+    } else {
+        $statusLevel = 'available';
+        $statusText = 'Available (' . $availableSpaces . ' Free)';
+        $badgeClass = 'bg-success';
+        $textColor = 'text-success';
+        $markerColor = '#198754'; // Green
+    }
+
+    return [
+        'id' => (int)$facility['id'],
+        'name' => $facility['name'],
+        'area' => $facility['area'],
+        'vehicle_type' => $facility['vehicle_type'],
+        'total_capacity' => $totalCapacity,
+        'available_spaces' => $availableSpaces,
+        'occupied_spaces' => $occupied,
+        'occupancy_percent' => $occupancyPercent,
+        'capacity_bike' => $capacityBike,
+        'available_bike' => $availableBike,
+        'capacity_car' => $capacityCar,
+        'available_car' => $availableCar,
+        'status_level' => $statusLevel,
+        'status_text' => $statusText,
+        'badge_class' => $badgeClass,
+        'text_color' => $textColor,
+        'marker_color' => $markerColor,
+        'last_updated' => $facility['last_spaces_update'] ?? date('Y-m-d H:i:s')
+    ];
+}
+
+function adjustFacilitySpace($id, $vehicleType, $direction) {
+    $facility = getParkingById($id);
+    if (!$facility) {
+        return ['success' => false, 'error' => 'Facility not found'];
+    }
+
+    $capBike = (int)($facility['capacity_bike'] ?? 30);
+    $availBike = (int)($facility['available_bike'] ?? 12);
+    $capCar = (int)($facility['capacity_car'] ?? 20);
+    $availCar = (int)($facility['available_car'] ?? 8);
+
+    if ($vehicleType === 'bike') {
+        if ($direction === 'entry') {
+            if ($availBike <= 0) return ['success' => false, 'error' => 'No bike spaces available'];
+            $availBike--;
+        } elseif ($direction === 'exit') {
+            if ($availBike >= $capBike) return ['success' => false, 'error' => 'Bike spaces already at maximum capacity'];
+            $availBike++;
+        }
+    } elseif ($vehicleType === 'car') {
+        if ($direction === 'entry') {
+            if ($availCar <= 0) return ['success' => false, 'error' => 'No car spaces available'];
+            $availCar--;
+        } elseif ($direction === 'exit') {
+            if ($availCar >= $capCar) return ['success' => false, 'error' => 'Car spaces already at maximum capacity'];
+            $availCar++;
+        }
+    } else {
+        // General vehicle
+        if ($direction === 'entry') {
+            if ($availBike > 0 && ($availCar <= 0 || rand(0, 1) === 0)) {
+                $availBike--;
+            } elseif ($availCar > 0) {
+                $availCar--;
+            } else {
+                return ['success' => false, 'error' => 'Parking facility is completely full'];
+            }
+        } else {
+            if ($availCar < $capCar && ($availBike >= $capBike || rand(0, 1) === 0)) {
+                $availCar++;
+            } elseif ($availBike < $capBike) {
+                $availBike++;
+            }
+        }
+    }
+
+    $totalAvail = $availBike + $availCar;
+
+    $db = getDbConnection();
+    $driver = $db->getAttribute(PDO::ATTR_DRIVER_NAME);
+    $timeFunc = ($driver === 'mysql') ? 'NOW()' : "datetime('now')";
+
+    $stmt = $db->prepare("UPDATE parking_facilities SET 
+        available_spaces = ?,
+        available_bike = ?,
+        available_car = ?,
+        last_spaces_update = {$timeFunc}
+        WHERE id = ?");
+    $stmt->execute([$totalAvail, $availBike, $availCar, (int)$id]);
+
+    $updated = getParkingById($id);
+    return [
+        'success' => true,
+        'facility' => formatRealtimeSpacesData($updated),
+        'message' => ucfirst($vehicleType) . ' ' . ($direction === 'entry' ? 'entry recorded (-1 spot)' : 'exit recorded (+1 spot)')
+    ];
+}
+
+function setFacilitySpaces($id, $availableBike, $availableCar) {
+    $facility = getParkingById($id);
+    if (!$facility) {
+        return ['success' => false, 'error' => 'Facility not found'];
+    }
+
+    $capBike = (int)($facility['capacity_bike'] ?? 30);
+    $capCar = (int)($facility['capacity_car'] ?? 20);
+
+    $availBike = max(0, min($capBike, (int)$availableBike));
+    $availCar = max(0, min($capCar, (int)$availableCar));
+    $totalAvail = $availBike + $availCar;
+
+    $db = getDbConnection();
+    $driver = $db->getAttribute(PDO::ATTR_DRIVER_NAME);
+    $timeFunc = ($driver === 'mysql') ? 'NOW()' : "datetime('now')";
+
+    $stmt = $db->prepare("UPDATE parking_facilities SET 
+        available_spaces = ?,
+        available_bike = ?,
+        available_car = ?,
+        last_spaces_update = {$timeFunc}
+        WHERE id = ?");
+    $stmt->execute([$totalAvail, $availBike, $availCar, (int)$id]);
+
+    $updated = getParkingById($id);
+    return [
+        'success' => true,
+        'facility' => formatRealtimeSpacesData($updated),
+        'message' => 'Spaces updated successfully'
+    ];
+}
+
+function getAllRealtimeFacilities() {
+    $facilities = getActiveParking();
+    $data = [];
+    foreach ($facilities as $facility) {
+        $data[] = formatRealtimeSpacesData($facility);
+    }
+    return $data;
+}
+
+function simulateRandomTraffic() {
+    $facilities = getActiveParking();
+    if (empty($facilities)) {
+        return ['success' => false, 'error' => 'No parking facilities available'];
+    }
+
+    // Pick a random facility
+    $randomFacility = $facilities[array_rand($facilities)];
+    $id = $randomFacility['id'];
+    $vehicleType = ($randomFacility['vehicle_type'] === 'motorcycle') ? 'bike' : (($randomFacility['vehicle_type'] === 'car') ? 'car' : (rand(0, 1) ? 'bike' : 'car'));
+    
+    // Choose entry or exit based on current availability
+    $avail = (int)($randomFacility['available_spaces'] ?? 20);
+    $total = (int)($randomFacility['total_capacity'] ?? 50);
+
+    if ($avail <= 2) {
+        $direction = 'exit';
+    } elseif ($avail >= $total - 2) {
+        $direction = 'entry';
+    } else {
+        $direction = rand(0, 1) ? 'entry' : 'exit';
+    }
+
+    $result = adjustFacilitySpace($id, $vehicleType, $direction);
+    if ($result['success']) {
+        $result['log'] = date('H:i:s') . " - " . $randomFacility['name'] . " (" . $randomFacility['area'] . "): 1 " . ucfirst($vehicleType) . " " . ($direction === 'entry' ? 'ENTERED' : 'EXITED') . " (Available: " . $result['facility']['available_spaces'] . "/" . $result['facility']['total_capacity'] . ")";
+    }
+    return $result;
+}
+

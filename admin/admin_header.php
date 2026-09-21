@@ -87,6 +87,9 @@ $currentAdminScript = basename($_SERVER['SCRIPT_NAME']);
                 <a href="<?php echo adminUrl('/admin/parking.php'); ?>" class="admin-nav-link <?php echo ($currentAdminScript === 'parking.php' || $currentAdminScript === 'edit-parking.php') ? 'active' : ''; ?>">
                     <i class="bi bi-p-square"></i> Facilities List
                 </a>
+                <a href="<?php echo adminUrl('/admin/live-spaces.php'); ?>" class="admin-nav-link <?php echo ($currentAdminScript === 'live-spaces.php') ? 'active' : ''; ?>">
+                    <i class="bi bi-broadcast text-success"></i> Live Spaces Monitor
+                </a>
                 <a href="<?php echo adminUrl('/admin/add-parking.php'); ?>" class="admin-nav-link <?php echo ($currentAdminScript === 'add-parking.php') ? 'active' : ''; ?>">
                     <i class="bi bi-plus-circle"></i> Add Facility
                 </a>
@@ -99,8 +102,8 @@ $currentAdminScript = basename($_SERVER['SCRIPT_NAME']);
                 </div>
                 <div class="px-3 text-muted small">
                     <div>BIM Summer Project</div>
-                    <div>PHP + SQLite/MySQL</div>
-                    <div class="mt-2 text-dark fw-medium">Ver. 1.0 (2026)</div>
+                    <div>PHP 8 + MySQL (XAMPP)</div>
+                    <div class="mt-2 text-dark fw-medium">Ver. 1.0</div>
                 </div>
             </div>
         </div>

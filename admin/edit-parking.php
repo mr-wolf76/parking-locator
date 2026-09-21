@@ -30,6 +30,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $status = sanitizeInput($_POST['status'] ?? 'active');
     $lastVerified = sanitizeInput($_POST['last_verified'] ?? date('Y-m-d'));
 
+    $capacityBike = max(0, (int)($_POST['capacity_bike'] ?? 30));
+    $availableBike = max(0, min($capacityBike, (int)($_POST['available_bike'] ?? 10)));
+    $capacityCar = max(0, (int)($_POST['capacity_car'] ?? 20));
+    $availableCar = max(0, min($capacityCar, (int)($_POST['available_car'] ?? 5)));
+    $totalCapacity = $capacityBike + $capacityCar;
+    $availableSpaces = $availableBike + $availableCar;
+
     if (empty($name) || empty($address) || empty($area)) {
         $errorMessage = 'Name, address, and area are required.';
     } elseif ($latitude === false || $longitude === false) {

@@ -4,7 +4,6 @@ $pageTitle = 'Parking Areas in Kathmandu | Parking Locator';
 $areas = getParkingAreas();
 
 require_once __DIR__ . '/includes/header.php';
-require_once __DIR__ . '/includes/navbar.php';
 ?>
 
 <div class="bg-white border-bottom py-4">

@@ -175,9 +175,7 @@ The administrative dashboard allows authorized staff to manage parking facilitie
    ```text
    http://localhost/parking-system/admin/login.php
    ```
-2. Enter the default administrator credentials:
-   * **Username:** `admin`
-   * **Password:** `admin123`
+2. Enter your administrator credentials.
 3. Click **Sign In**.
 4. The administrator can:
    * View live statistics (total facilities, active locations, pending reports).
@@ -193,55 +191,46 @@ The administrative dashboard allows authorized staff to manage parking facilitie
 ```text
 parking-system/
 │
-├── index.php                 # Public homepage with destination search & quick chips
-├── find-parking.php          # Main locator interface with filters and Leaflet map
+├── index.php                 # Homepage with destination search & quick chips
+├── find-parking.php          # Main locator with filters and interactive Leaflet map
 ├── parking-details.php       # Facility profile, specifications, and navigation
-├── areas.php                 # Kathmandu study areas catalogue
-├── about.php                 # Academic background, problem statement, and specs
-├── report.php                # Public discrepancy reporting form
+├── areas.php                 # Kathmandu study areas overview
+├── about.php                 # Academic BIM project background and details
+├── report.php                # Discrepancy reporting form
 │
 ├── config/
-│   └── database.php          # Central PDO connection handler (MySQL with SQLite fallback)
+│   └── database.php          # Database connection file (XAMPP MySQL)
 │
 ├── includes/
-│   ├── header.php            # HTML5 header, CDN links, and metadata
-│   ├── navbar.php            # Responsive Bootstrap navigation bar
-│   ├── footer.php            # Public footer and CDN script links
-│   ├── auth.php              # Session authentication and token helper
-│   └── functions.php         # Spatial distance calculations and data queries
+│   ├── header.php            # HTML header and top navigation bar
+│   ├── footer.php            # Footer and script includes
+│   ├── auth.php              # Simple admin session check
+│   └── functions.php         # Haversine distance formula and helper queries
 │
 ├── assets/
 │   ├── css/
-│   │   └── style.css         # Custom typography and interface styling
-│   ├── js/
-│   │   ├── main.js           # General UI and alert dismiss handlers
-│   │   ├── map.js            # Leaflet map configuration and custom pins
-│   │   └── parking.js        # Client-side dynamic filtering and card sync
-│   └── images/               # Static system graphic assets
-│
-├── api/
-│   ├── destinations.php      # Destination search and landmark coordinates API
-│   ├── search-parking.php    # Haversine distance-calculated parking search API
-│   ├── get-parking.php       # Single or all parking facility retrieval API
-│   └── report.php            # Citizen discrepancy reporting submission API
+│   │   └── style.css         # Clean custom styles
+│   └── js/
+│       └── main.js           # Single unified JavaScript file for maps and UI
 │
 ├── admin/
-│   ├── login.php             # Admin authentication portal
+│   ├── login.php             # Admin login page
 │   ├── index.php             # Admin dashboard with summary cards
-│   ├── parking.php           # Master facilities inventory table
-│   ├── add-parking.php       # Facility creation form
-│   ├── edit-parking.php      # Facility modification form
-│   ├── delete-parking.php    # Safe deletion confirmation
-│   ├── reports.php           # User issue verification panel
-│   ├── admin_header.php      # Admin layout header and navigation
-│   ├── admin_footer.php      # Admin layout footer
-│   └── logout.php            # Session destruction handler
+│   ├── parking.php           # Facilities management list
+│   ├── add-parking.php       # Add new parking facility
+│   ├── edit-parking.php      # Edit facility details
+│   ├── delete-parking.php    # Delete parking facility
+│   ├── reports.php           # Review user issue reports
+│   ├── admin_header.php      # Admin panel header and navigation
+│   ├── admin_footer.php      # Admin panel footer
+│   └── logout.php            # Admin logout
 │
 ├── database/
-│   ├── parking_locator.sql   # Complete MySQL schema and seed data
-│   └── init_sqlite.php       # SQLite initialization script for standalone mode
+│   ├── parking_locator.sql   # Complete MySQL database export (for phpMyAdmin)
+│   └── parking_locator.sqlite# Local preview SQLite database
 │
-└── README.md                 # Complete project documentation and guide
+└── uploads/
+    └── parking/              # Uploaded facility photos
 ```
 
 ---

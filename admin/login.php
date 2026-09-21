@@ -29,25 +29,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $admin = $stmt->fetch();
 
         if ($admin && password_verify($password, $admin['password'])) {
-            $token = generateAdminToken($admin['id'], $admin['username']);
             $_SESSION['admin_logged_in'] = true;
             $_SESSION['admin_id'] = $admin['id'];
             $_SESSION['admin_username'] = $admin['username'];
-            
-            setcookie('admin_token', $token, [
-                'expires' => time() + (86400 * 7),
-                'path' => '/',
-                'domain' => '',
-                'secure' => true,
-                'httponly' => true,
-                'samesite' => 'None'
-            ]);
 
-            $targetUrl = "{$baseUrl}/admin/index.php?admin_token=" . urlencode($token) . "&sid=" . urlencode(session_id());
-            header("Location: {$targetUrl}");
+            header("Location: {$baseUrl}/admin/index.php");
             exit;
         } else {
-            $errorMessage = 'Invalid username or password. Please use admin / admin123.';
+            $errorMessage = 'Invalid username or password.';
         }
     }
 }
@@ -129,7 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <label for="admin-username" class="form-label fw-semibold text-dark small">Username</label>
                         <div class="input-group">
                             <span class="input-group-text bg-light text-muted"><i class="bi bi-person"></i></span>
-                            <input type="text" name="username" id="admin-username" class="form-control" required autocomplete="username" value="admin" autofocus>
+                            <input type="text" name="username" id="admin-username" class="form-control" placeholder="Enter username" required autocomplete="username" autofocus>
                         </div>
                     </div>
 
@@ -137,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <label for="admin-password" class="form-label fw-semibold text-dark small">Password</label>
                         <div class="input-group">
                             <span class="input-group-text bg-light text-muted"><i class="bi bi-key"></i></span>
-                            <input type="password" name="password" id="admin-password" class="form-control" required autocomplete="current-password" value="admin123">
+                            <input type="password" name="password" id="admin-password" class="form-control" placeholder="Enter password" required autocomplete="current-password">
                         </div>
                     </div>
 
@@ -151,20 +140,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </a>
                     </div>
                 </form>
-            </div>
-
-            <div class="card border border-primary-subtle bg-primary-subtle p-3 rounded-3">
-                <div class="d-flex align-items-center gap-2 text-primary fw-semibold small mb-2">
-                    <i class="bi bi-shield-check fs-6"></i>
-                    <span>System Credentials</span>
-                </div>
-                <div class="small text-secondary mb-2">
-                    <div><strong>Username:</strong> <code class="text-dark">admin</code></div>
-                    <div><strong>Password:</strong> <code class="text-dark">admin123</code></div>
-                </div>
-                <button type="button" class="btn btn-outline-primary btn-sm w-100 fw-medium bg-white" onclick="document.getElementById('admin-username').value='admin'; document.getElementById('admin-password').value='admin123'; document.getElementById('admin-login-form').submit();">
-                    <i class="bi bi-lightning-charge-fill text-warning me-1"></i> Quick 1-Click Sign In
-                </button>
             </div>
         </div>
     </div>

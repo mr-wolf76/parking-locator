@@ -43,7 +43,6 @@ $pageTitle = !empty($destination) ?
     'Find Parking in Kathmandu | Parking Locator';
 
 require_once __DIR__ . '/includes/header.php';
-require_once __DIR__ . '/includes/navbar.php';
 ?>
 
 <div class="bg-white border-bottom py-3">
@@ -131,6 +130,20 @@ require_once __DIR__ . '/includes/navbar.php';
                 </div>
             </div>
 
+            <!-- Real-time Live Status Bar -->
+            <div class="d-flex align-items-center justify-content-between p-2 mb-3 bg-white border rounded-2 small shadow-xs">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="live-pulse-dot" id="live-indicator-dot"></span>
+                    <span class="text-dark fw-semibold" id="live-indicator-text">Live Gate Sensors Connected</span>
+                    <span class="text-muted d-none d-sm-inline" style="font-size: 0.75rem;" id="live-last-sync">Auto-polling</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-light border py-0 px-2 text-secondary" id="manual-refresh-spaces-btn" title="Fetch latest space numbers">
+                        <i class="bi bi-arrow-repeat me-1"></i>Sync Now
+                    </button>
+                </div>
+            </div>
+
             <div id="empty-results-state" class="<?php echo count($parkingFacilities) === 0 ? '' : 'd-none'; ?> p-5 text-center bg-white border rounded-3 my-3">
                 <div class="stat-icon-wrapper bg-light text-muted mx-auto mb-3">
                     <i class="bi bi-slash-circle"></i>
@@ -148,6 +161,7 @@ require_once __DIR__ . '/includes/navbar.php';
                 <div class="d-flex flex-column gap-3">
                     <?php foreach ($parkingFacilities as $facility): ?>
                         <?php
+                            $liveData = formatRealtimeSpacesData($facility);
                             $jsonAttr = htmlspecialchars(json_encode([
                                 'id' => (int)$facility['id'],
                                 'name' => $facility['name'],
@@ -158,7 +172,17 @@ require_once __DIR__ . '/includes/navbar.php';
                                 'payment_type' => $facility['payment_type'],
                                 'parking_fee' => $facility['parking_fee'],
                                 'vehicle_type' => $facility['vehicle_type'],
-                                'distance_formatted' => $facility['distance_formatted'] ?? null
+                                'distance_formatted' => $facility['distance_formatted'] ?? null,
+                                'total_capacity' => $liveData['total_capacity'],
+                                'available_spaces' => $liveData['available_spaces'],
+                                'capacity_bike' => $liveData['capacity_bike'],
+                                'available_bike' => $liveData['available_bike'],
+                                'capacity_car' => $liveData['capacity_car'],
+                                'available_car' => $liveData['available_car'],
+                                'status_level' => $liveData['status_level'],
+                                'status_text' => $liveData['status_text'],
+                                'badge_class' => $liveData['badge_class'],
+                                'occupancy_percent' => $liveData['occupancy_percent']
                             ]), ENT_QUOTES, 'UTF-8');
                         ?>
                         <div class="parking-card parking-card-item p-3 cursor-pointer" 
@@ -194,13 +218,44 @@ require_once __DIR__ . '/includes/navbar.php';
                                         <i class="bi bi-geo-alt me-1"></i><?php echo htmlspecialchars($facility['address']); ?>
                                     </div>
                                 </div>
-                                <?php if (!empty($facility['distance_formatted'])): ?>
-                                    <div class="text-end ps-2">
-                                        <span class="badge bg-light text-primary border border-primary-subtle fs-7 fw-semibold">
-                                            <i class="bi bi-signpost-2 me-1"></i><?php echo htmlspecialchars($facility['distance_formatted']); ?>
-                                        </span>
+                                <div class="text-end ps-2">
+                                    <span class="badge <?php echo $liveData['badge_class']; ?> fs-7 live-space-badge" id="live-badge-<?php echo $facility['id']; ?>">
+                                        <i class="bi bi-broadcast me-1"></i><span class="badge-text"><?php echo $liveData['status_text']; ?></span>
+                                    </span>
+                                    <?php if (!empty($facility['distance_formatted'])): ?>
+                                        <div class="mt-1">
+                                            <span class="badge bg-light text-primary border border-primary-subtle fs-7 fw-semibold">
+                                                <i class="bi bi-signpost-2 me-1"></i><?php echo htmlspecialchars($facility['distance_formatted']); ?>
+                                            </span>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+
+                            <!-- Live Availability Progress Bar -->
+                            <div class="p-2 my-2 rounded border bg-light live-space-box" id="live-space-box-<?php echo $facility['id']; ?>">
+                                <div class="d-flex justify-content-between align-items-center small mb-1">
+                                    <span class="text-muted fw-medium d-flex align-items-center gap-1">
+                                        <span class="live-pulse-dot <?php echo ($liveData['status_level'] === 'full' ? 'dot-danger' : ($liveData['status_level'] === 'limited' ? 'dot-warning' : '')); ?>"></span>
+                                        Live Space Availability
+                                    </span>
+                                    <span class="fw-bold" id="live-summary-<?php echo $facility['id']; ?>">
+                                        <span class="<?php echo $liveData['text_color']; ?> fs-6"><?php echo $liveData['available_spaces']; ?></span> / <?php echo $liveData['total_capacity']; ?> Free
+                                    </span>
+                                </div>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar <?php echo ($liveData['status_level'] === 'full' ? 'bg-danger' : ($liveData['status_level'] === 'limited' ? 'bg-warning' : 'bg-success')); ?>" 
+                                         id="live-progress-<?php echo $facility['id']; ?>"
+                                         role="progressbar" 
+                                         style="width: <?php echo $liveData['occupancy_percent']; ?>%;" 
+                                         aria-valuenow="<?php echo $liveData['occupancy_percent']; ?>" aria-valuemin="0" aria-valuemax="100">
                                     </div>
-                                <?php endif; ?>
+                                </div>
+                                <div class="d-flex justify-content-between text-muted mt-1" style="font-size: 0.75rem;">
+                                    <span><i class="bi bi-bicycle me-1"></i>Bikes: <strong id="live-bike-<?php echo $facility['id']; ?>"><?php echo $liveData['available_bike']; ?></strong>/<?php echo $liveData['capacity_bike']; ?> free</span>
+                                    <span><i class="bi bi-car-front me-1"></i>Cars: <strong id="live-car-<?php echo $facility['id']; ?>"><?php echo $liveData['available_car']; ?></strong>/<?php echo $liveData['capacity_car']; ?> free</span>
+                                    <span>Occupancy: <strong id="live-occupancy-<?php echo $facility['id']; ?>"><?php echo $liveData['occupancy_percent']; ?>%</strong></span>
+                                </div>
                             </div>
 
                             <div class="d-flex flex-wrap align-items-center justify-content-between pt-2 mt-2 border-top gap-2">
@@ -234,13 +289,17 @@ require_once __DIR__ . '/includes/navbar.php';
     </div>
 </div>
 
-<script src="<?php echo $baseUrl; ?>/assets/js/map.js"></script>
-<script src="<?php echo $baseUrl; ?>/assets/js/parking.js"></script>
 <script>
 window.appBaseUrl = <?php echo json_encode($baseUrl); ?>;
 document.addEventListener('DOMContentLoaded', function() {
     var destData = <?php echo json_encode($destCoords); ?>;
-    var facilities = <?php echo json_encode(array_values($parkingFacilities)); ?>;
+    <?php
+    $formattedFacilities = array_map(function($f) {
+        $formatted = formatRealtimeSpacesData($f);
+        return array_merge($f, $formatted);
+    }, $parkingFacilities);
+    ?>
+    var facilities = <?php echo json_encode(array_values($formattedFacilities)); ?>;
     initFinderMap(destData, facilities, window.appBaseUrl);
 });
 </script>
